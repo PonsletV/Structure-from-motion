@@ -6,6 +6,9 @@ class Match(object):
     def __init__(self, detector, img_left, img_right):
         self.img_left = img_left
         self.img_right = img_right
+
+        self.img_shape = img_left.shape
+
         self.detector = detector
 
         self.is_fitted = False
@@ -19,7 +22,9 @@ class Match(object):
         self.kp_l, self.kp_r, _, _, self.matches = self.detector.fit(self.img_left, self.img_right)
         self.is_fitted = True
 
-    def select_matches(self, match_threshold=100):
+    def select_matches(self, match_threshold=None):
+        if match_threshold is None:
+            match_threshold = 0.2*self.img_shape[0]
         if not self.is_fitted:
             raise ValueError("must fit Match object first")
         self.matches, self.H = select_matches(self.kp_l, self.kp_r, self.matches, match_threshold)

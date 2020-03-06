@@ -23,6 +23,7 @@ def appendimages(im1, im2):
 
 
 def plot_matches(match: Match):
+    """ Plot the matches in object Match with lines showing the correspondances """
     pts1 = make_homog(np.transpose(np.array([match.kp_l[m.queryIdx].pt for m in match.matches])))
     pts2 = make_homog(np.transpose(np.array([match.kp_r[m.trainIdx].pt for m in match.matches])))
 
@@ -54,14 +55,14 @@ def plot_3D_points(points3D, P_list=None):
     """
     fig = plt.figure()
     ax = fig.gca(projection='3d')
-    ax.plot(points3D.T[0], points3D.T[1], points3D.T[2], 'k.')
+    ax.plot(points3D[0], points3D[1], points3D[2], 'k.')
     if P_list is not None:
         for P in P_list:
             ax.plot([P[0, 3]], [P[1, 3]], [P[2, 3]], 'r.')
     plt.show()
 
 
-def plot_reprojection(sfm : Sfm, img_idx="all"):
+def plot_reprojection(sfm: Sfm, img_idx="all"):
     """
     Print the points of the sfm and their reprojection
     :param sfm: Structure from motion object
@@ -69,11 +70,11 @@ def plot_reprojection(sfm : Sfm, img_idx="all"):
     """
 
     if img_idx == "l":
-        im = sfm.img_left
+        im = sfm.match.img_left
         xp = sfm.xp_l
         x = sfm.x_l
     elif img_idx == "r":
-        im = sfm.img_right
+        im = sfm.match.img_right
         xp = sfm.xp_r
         x = sfm.x_r
     else:

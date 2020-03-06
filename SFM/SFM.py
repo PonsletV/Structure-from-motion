@@ -9,18 +9,14 @@ class Sfm(object):
     def __init__(self, calibration: Calibration, match: Match, projection_left: Projection):
         """
         Initialize the structure needed to reconstruct the 3D points from the scene
-        :param img_left: first image
-        :param img_right: second image
         :param calibration: calibration object (contains the K matrix)
-        :param descriptor: descriptor object (fitted)
+        :param match: Match object with the point detector and images
         :param projection_left: projection object, current position of the left camera
         """
         self.calibration = calibration
         self.match = match
         self.P_left = projection_left
-        self.img_left = match.img_left
-        self.img_right = match.img_right
-        self.img_shape = match.img_left.shape
+        self.img_shape = match.img_shape
 
         self.is_fitted = False
 
@@ -45,7 +41,7 @@ class Sfm(object):
     def fit_reconstruction(self):
         """
         Reconstruct the 3D points (after fit_descriptor)
-        :return: list of 3D points
+        :return: list of 3D points of size (3*n)
         """
         if not self.match.is_fitted:
             raise ValueError("must call fit_descriptor before")
@@ -83,11 +79,11 @@ class Sfm(object):
         # find the position of the 3D points with a triangulation
         X = cv2.triangulatePoints(np.dot(K, P_l.P), np.dot(K, P_r.P), pts_l.T, pts_r.T)
         X = X / X[3]
-        threeDpoints = X[:3, :].T
+        threeDpoints = X[:3, :]
 
         # reproject the 3D points through the cameras
-        xlp, _ = cv2.projectPoints(threeDpoints, P_l.rv, P_l.t, K, distCoeffs=self.calibration.dist_coeff)
-        xrp, _ = cv2.projectPoints(threeDpoints, P_r.rv, P_r.t, K, distCoeffs=self.calibration.dist_coeff)
+        xlp, _ = cv2.projectPoints(threeDpoints.T, P_l.rv, P_l.t, K, distCoeffs=self.calibration.dist_coeff)
+        xrp, _ = cv2.projectPoints(threeDpoints.T, P_r.rv, P_r.t, K, distCoeffs=self.calibration.dist_coeff)
 
         # kept points from the initial keypoints on the two images
         self.x_l = pts_l.T
@@ -121,3 +117,9 @@ class Sfm(object):
             print('Reprojection error on left image : ', error1)
             print('Reprojection error on right image : ', error2)
         return error1, error2
+
+    def num_points(self):
+        if self.threeDpoints is not None:
+            return self.threeDpoints.shape[0]
+        else:
+            return 0

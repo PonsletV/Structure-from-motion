@@ -3,16 +3,17 @@ from utils.load import load
 from utils.calibrate import calibrate
 from SFM.camera import Projection
 from utils.display import *
+from Descriptors.orb import Orb
 #%%
 
 
 im_list = load('dataset/sfm')
 calibration = calibrate('dataset/calib')
 
-detector = Sift(nfeatures=5000, sigma=3, lowe_factor=0.7)
+detector = Orb(nfeatures=10000)
 matcher = Match(detector, im_list[0], im_list[1])
 matcher.fit()
-matcher.select_matches(match_threshold=0.3*im_list[0].shape[0])
+matcher.select_matches(match_threshold=0.1*matcher.img_shape[0])
 
 plot_matches(matcher)
 
