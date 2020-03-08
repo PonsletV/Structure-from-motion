@@ -10,17 +10,19 @@ class Sift(object):
                                                     edgeThreshold=edgeThreshold, sigma=sigma)
         self.lowe_factor = lowe_factor
 
-    def fit(self, img1, img2):
+    def detect(self, img):
+        kp, des = self.detector.detectAndCompute(img, None)
+        return np.array(kp), np.array(des)
 
-        kp1, des1 = self.detector.detectAndCompute(img1, None)
-        kp2, des2 = self.detector.detectAndCompute(img2, None)
-
+    def match(self, des1, des2):
         bf = cv2.BFMatcher_create(cv2.NORM_L2)
         matches = bf.knnMatch(des1, des2, k=2)
+
 
         good = []
         for m, n in matches:
             if m.distance < self.lowe_factor * n.distance:
                 good.append([m])
 
-        return np.array(kp1), np.array(kp2), np.array(des1), np.array(des2), np.array(good)[:, 0]
+        good = sorted([g[0] for g in good], key=lambda x: x.queryIdx)
+        return np.array(good)

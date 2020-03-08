@@ -36,7 +36,7 @@ class PySBA:
             camera_ind with shape (n_observations,)
                     contains indices of cameras (from 0 to n_cameras - 1) involved in each observation.
             point_ind with shape (n_observations,)
-                    contatins indices of points (from 0 to n_points - 1) involved in each observation.
+                    contains indices of points (from 0 to n_points - 1) involved in each observation.
             points_2d with shape (n_observations, 2)
                     contains measured 2-D coordinates of points projected on images in each observations.
         """
@@ -101,7 +101,6 @@ class PySBA:
 
         return A
 
-
     def optimizedParams(self, params, n_cameras, n_points):
         """
         Retrieve camera parameters and 3-D coordinates.
@@ -110,7 +109,6 @@ class PySBA:
         points_3d = params[n_cameras * 9:].reshape((n_points, 3))
 
         return camera_params, points_3d
-
 
     def bundleAdjust(self):
         """ Returns the bundle adjusted parameters, in this case the optimized

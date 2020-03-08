@@ -4,6 +4,7 @@ import os
 import glob
 from SFM.camera import Calibration
 
+
 def calibrate(dirpath):
     # termination criteria
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)

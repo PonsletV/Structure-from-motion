@@ -6,16 +6,16 @@ import cv2
 class Camera(object):
     """ Class for representing pin-hole cameras. """
 
-    def __init__(self, Proj, calib):
+    def __init__(self, projection, calibration):
         """ Initialize P = K[R|t] camera model. """
-        self.Projection = Proj
-        self.Calibration = calib # calibration matrix
+        self.projection = projection
+        self.calibration = calibration # calibration matrix
         self.c = None
 
     def project(self, X):
         """ Project points in X (3*n array) """
-        return cv2.projectPoints(X, self.Projection.rv, self.Projection.t,
-                                 self.Calibration.K, distCoeffs=self.Calibration.dist_coeff)
+        return cv2.projectPoints(X, self.projection.rv, self.projection.t,
+                                 self.calibration.K, distCoeffs=self.calibration.dist_coeff)
 
     def center(self):
         """ Compute and return the camera center. """
@@ -24,19 +24,28 @@ class Camera(object):
             return self.c
         else:
             # compute c by factoring
-            self.c = -np.dot(self.Projection.R.T, self.Projection.t)
+            self.c = -np.dot(self.projection.R.T, self.projection.t)
             return self.c
+
+    def to_bundle(self):
+        rv = self.projection.rv
+        t = self.projection.t
+        f = self.calibration.focal()
+        k1 = self.calibration.dist_coeff[:, 0]
+        k2 = self.calibration.dist_coeff[:, 1]
+        return np.array([rv[0][0], rv[1][0], rv[2][0],
+                         t[0][0], t[1][0], t[2][0],
+                         f, k1, k2], dtype=float)
 
 
 class Projection(object):
     """ Class for representing P = [R|t]"""
     def __init__(self, P = np.hstack((np.eye(3), np.zeros((3, 1))))):
-        if P is not None:
-            self.P = P
-            self.R = None
-            self.t = None
-            self.rv = None
-            self.factor()
+        self.P = P
+        self.R = None
+        self.t = None
+        self.rv = None
+        self.factor()
 
     def __getitem__(self, item):
         return self.P[item]
@@ -61,7 +70,7 @@ class Calibration(object):
 def rotation_matrix(a):
     """ Creates a 3D rotation matrix for rotation aroud the axis of the vector a. """
     R = np.eye(4)
-    R[:3,:3] = linalg.expm([[0, -a[2], a[1]], [a[2], 0, -a[0]], [-a[1], a[0], 0]])
+    R[:3, :3] = linalg.expm([[0, -a[2], a[1]], [a[2], 0, -a[0]], [-a[1], a[0], 0]])
     return R
 
 

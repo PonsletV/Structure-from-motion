@@ -19,7 +19,9 @@ class Match(object):
 
     def fit(self):
         """ compute the keypoints and descriptors """
-        self.kp_l, self.kp_r, _, _, self.matches = self.detector.fit(self.img_left, self.img_right)
+        self.kp_l, des_l = self.detector.detect(self.img_left)
+        self.kp_r, des_r = self.detector.detect(self.img_right)
+        self.matches = self.detector.match(des_l, des_r)
         self.is_fitted = True
 
     def select_matches(self, match_threshold=None):
@@ -28,6 +30,102 @@ class Match(object):
         if not self.is_fitted:
             raise ValueError("must fit Match object first")
         self.matches, self.H = select_matches(self.kp_l, self.kp_r, self.matches, match_threshold)
+
+
+class MultiMatch(object):
+    def __init__(self, detector, img_list):
+        self.img_list = img_list
+        self.img_shape = img_list[0].shape
+        self.n_img = len(img_list)
+
+        self.detector = detector
+
+        self.is_fitted = False
+
+        self.view_points = np.array([], dtype=np.int64).reshape(2, 0)  # correspondences between views and 2D points
+        self.points2D = np.array([], dtype=np.float).reshape(2, 0)
+        self.kp_list = []
+        self.matches = []
+        self.adjacency = []
+
+    def fit(self, match_threshold=None):
+        """ We match each image with the following one """
+
+        # We will first compute the keypoints and descriptors for each images
+        i = 0
+        des_list = []
+        for img in self.img_list:
+            kp, des = self.detector.detect(img)
+            self.kp_list.append(kp)
+            des_list.append(des)
+
+            self.points2D = np.hstack((self.points2D, np.array([np.array(k.pt) for k in kp]).T))
+            self.view_points = np.append(self.view_points, np.arange(i, i + len(kp)))
+            i += len(kp)
+
+        if match_threshold is None:
+            match_threshold = 0.1*self.img_shape[0]
+
+        matches = []
+
+        # Here we match each image with the following
+
+        for i in range(self.n_img-1):
+            match, _ = select_matches(self.kp_list[i], self.kp_list[i+1],
+                                      self.detector.match(des_list[i], des_list[i+1]), match_threshold)
+
+            matches.append(match)
+
+        self.matches = matches
+        self.is_fitted = True
+
+    def make_adjacency_list(self):
+
+        adjacency = [[i] for i in range(self.points2D.shape[1])]
+
+        space_i = 0
+        space_ipp = 0
+
+        for i in range(self.n_img - 1):
+            space_ipp += len(self.kp_list[i])
+
+            match = self.matches[i]
+
+            for m in match:
+                adjacency[space_i + m.queryIdx].append(space_ipp + m.trainIdx)
+                adjacency[space_ipp + m.trainIdx].append(space_i + m.queryIdx)
+
+            space_i = space_ipp
+
+        # Now we will filtrate to keep score of matches across multiple images
+        new_adjacency = []
+        new_points2D = np.array([], dtype=np.float).reshape(2, 0)
+        new_view_points = []
+        for i in range(len(adjacency)):
+            if len(adjacency[i]) > 1:
+                new_adjacency.append(adjacency[i])
+                new_points2D = np.column_stack([new_points2D, self.points2D[:, i]])
+                new_view_points.append(self.view_points[i])
+
+        self.points2D = new_points2D
+        self.adjacency = new_adjacency
+        self.view_points = new_view_points
+
+        return new_adjacency
+
+    def get_points(self, i):
+        """ get all the 2D points belonging to a camera"""
+        mask = np.where(self.view_points == i)
+        return self.points2D[:, mask]
+
+    def get_match(self, i):
+        """ return a "Match" object between the i and i+1 image """
+        match = Match(self.detector, self.img_list[i], self.img_list[i+1])
+        match.is_fitted = True
+        match.kp_l = self.kp_list[i]
+        match.kp_r = self.kp_list[i+1]
+        match.matches = self.matches[i]
+        return match
 
 
 def select_matches(kp1, kp2, matches, match_threshold=100):
@@ -39,5 +137,6 @@ def select_matches(kp1, kp2, matches, match_threshold=100):
     pts2 = make_homog(np.transpose(np.array([kp2[m.trainIdx].pt for m in matches])))
 
     H, inliers = H_from_ransac(pts1, pts2, model, maxiter=1000, match_threshold=match_threshold)
+    inliers = np.sort(inliers)
 
     return matches[inliers], H

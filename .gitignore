@@ -9,3 +9,5 @@ venv/Scripts/pythonw.exe
 *.JPG
 Experiments/vincent.ipynb
 *.xml
+*.pyc
+*.pyc

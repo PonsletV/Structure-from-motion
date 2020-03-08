@@ -10,13 +10,14 @@ class Orb(object):
                                        patchSize, fastThreshold)
         self.matcher = cv2.BFMatcher_create(cv2.NORM_HAMMING, crossCheck=True)
 
-    def fit(self, img1, img2):
-        kp1, kp2 = self.detector.detect(img1), self.detector.detect(img2)
-        kp1, des1 = self.detector.compute(img1, kp1)
-        kp2, des2 = self.detector.compute(img2, kp2)
+    def detect(self, img):
+        kp, des = self.detector.detectAndCompute(img, None)
+        return np.array(kp), np.array(des)
+
+    def match(self, des1, des2):
 
         matches = self.matcher.match(des1, des2)
 
-        matches = sorted(matches, key=lambda x: x.distance)
+        matches = sorted(matches, key=lambda x: x.queryIdx)
 
-        return np.array(kp1), np.array(kp2), np.array(des1), np.array(des2), np.array(matches)
+        return np.array(matches)

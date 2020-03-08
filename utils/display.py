@@ -3,7 +3,7 @@ from mpl_toolkits.mplot3d import axes3d
 from utils.homography import make_homog
 from matplotlib import pyplot as plt
 from SFM.SFM import Sfm
-from Descriptors.matching import Match
+from Descriptors.matching import Match, MultiMatch
 
 
 def appendimages(im1, im2):
@@ -32,7 +32,7 @@ def plot_matches(match: Match):
     plt.imshow(img3)
     plt.gray()
 
-    cols1 = match.img_left.shape[1]
+    cols1 = match.img_shape[1]
 
     for i in range(len(match.matches)):
         plt.plot([pts1[0][i], pts2[0][i] + cols1], [pts1[1][i], pts2[1][i]], 'c', linewidth=0.5, linestyle='--')

@@ -1,26 +1,20 @@
 from Descriptors.sift import Sift
+from Descriptors.matching import MultiMatch
 from utils.load import load
 from utils.calibrate import calibrate
 from SFM.camera import Projection
+from SFM.reconstruction import Reconstruction
 from utils.display import *
 from Descriptors.orb import Orb
-#%%
-
+from utils.PySBA import PySBA
 
 im_list = load('dataset/sfm')
 calibration = calibrate('dataset/calib')
 
-detector = Orb(nfeatures=10000)
-matcher = Match(detector, im_list[0], im_list[1])
+detector = Sift(nfeatures=5000)
+matcher = MultiMatch(detector, im_list)
 matcher.fit()
-matcher.select_matches(match_threshold=0.1*matcher.img_shape[0])
+reconstruction = Reconstruction(matcher, calibration)
+X = reconstruction.reconstruct().T
 
-plot_matches(matcher)
-
-#%%
-initial_projection = Projection()
-structure_from_motion = Sfm(calibration, matcher, initial_projection)
-X = structure_from_motion.fit_reconstruction()
-
-plot_reprojection(structure_from_motion)
-plot_3D_points(X, [structure_from_motion.P_left, structure_from_motion.P_right])
+plot_3D_points(X)

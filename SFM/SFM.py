@@ -22,7 +22,6 @@ class Sfm(object):
 
         """ reconstruction properties """
         self.P_transformation = None
-        self.X = None
         self.E = None
         self.F = None
         self.P_right = None
@@ -30,9 +29,12 @@ class Sfm(object):
         """ points """
         self.x_l = None
         self.x_r = None
+        self.idx_l = None
+        self.idx_r = None
         self.xp_l = None
         self.xp_r = None
         self.threeDpoints = None
+        self.mask = None
 
     def fit_descriptor(self):
         """ compute the keypoints and descriptors, lowe_factor only used for SIFT"""
@@ -51,7 +53,9 @@ class Sfm(object):
 
         # get the coordinates of the points from the keypoints lists
         pts_l = np.array([self.match.kp_l[m.queryIdx].pt for m in self.match.matches])
+        idx_l = np.array([m.queryIdx for m in self.match.matches])
         pts_r = np.array([self.match.kp_r[m.trainIdx].pt for m in self.match.matches])
+        idx_r = np.array([m.trainIdx for m in self.match.matches])
 
         # estimate E with RANSAC
         E, mask = cv2.findEssentialMat(pts_l, pts_r, cameraMatrix=self.calibration.K, method=cv2.FM_RANSAC)
@@ -60,6 +64,9 @@ class Sfm(object):
         # select the inliers from RANSAC
         pts_l = pts_l[inliers, :]
         pts_r = pts_r[inliers, :]
+        idx_l = idx_l[inliers]
+        idx_r = idx_r[inliers]
+        self.mask = inliers
 
         # compute the fundamental F
         self.F = np.dot(np.linalg.inv(K.T), np.dot(E, np.linalg.inv(K)))
@@ -75,6 +82,9 @@ class Sfm(object):
         infront = np.where(mask_c != 0)[0]
         pts_l = pts_l[infront, :]
         pts_r = pts_r[infront, :]
+        idx_l = idx_l[infront]
+        idx_r = idx_r[infront]
+        self.mask = self.mask[infront]
 
         # find the position of the 3D points with a triangulation
         X = cv2.triangulatePoints(np.dot(K, P_l.P), np.dot(K, P_r.P), pts_l.T, pts_r.T)
@@ -88,6 +98,8 @@ class Sfm(object):
         # kept points from the initial keypoints on the two images
         self.x_l = pts_l.T
         self.x_r = pts_r.T
+        self.idx_l = idx_l
+        self.idx_r = idx_r
 
         # reprojected points
         self.xp_l = np.vstack((xlp[:, 0, 0], xlp[:, 0, 1]))
