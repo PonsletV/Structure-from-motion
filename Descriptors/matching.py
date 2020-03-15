@@ -42,11 +42,8 @@ class MultiMatch(object):
 
         self.is_fitted = False
 
-        self.view_points = np.array([], dtype=np.int64).reshape(2, 0)  # correspondences between views and 2D points
-        self.points2D = np.array([], dtype=np.float).reshape(2, 0)
         self.kp_list = []
         self.matches = []
-        self.adjacency = []
 
     def fit(self, match_threshold=None):
         """ We match each image with the following one """
@@ -59,8 +56,6 @@ class MultiMatch(object):
             self.kp_list.append(kp)
             des_list.append(des)
 
-            self.points2D = np.hstack((self.points2D, np.array([np.array(k.pt) for k in kp]).T))
-            self.view_points = np.append(self.view_points, np.arange(i, i + len(kp)))
             i += len(kp)
 
         if match_threshold is None:
@@ -78,45 +73,6 @@ class MultiMatch(object):
 
         self.matches = matches
         self.is_fitted = True
-
-    def make_adjacency_list(self):
-
-        adjacency = [[i] for i in range(self.points2D.shape[1])]
-
-        space_i = 0
-        space_ipp = 0
-
-        for i in range(self.n_img - 1):
-            space_ipp += len(self.kp_list[i])
-
-            match = self.matches[i]
-
-            for m in match:
-                adjacency[space_i + m.queryIdx].append(space_ipp + m.trainIdx)
-                adjacency[space_ipp + m.trainIdx].append(space_i + m.queryIdx)
-
-            space_i = space_ipp
-
-        # Now we will filtrate to keep score of matches across multiple images
-        new_adjacency = []
-        new_points2D = np.array([], dtype=np.float).reshape(2, 0)
-        new_view_points = []
-        for i in range(len(adjacency)):
-            if len(adjacency[i]) > 1:
-                new_adjacency.append(adjacency[i])
-                new_points2D = np.column_stack([new_points2D, self.points2D[:, i]])
-                new_view_points.append(self.view_points[i])
-
-        self.points2D = new_points2D
-        self.adjacency = new_adjacency
-        self.view_points = new_view_points
-
-        return new_adjacency
-
-    def get_points(self, i):
-        """ get all the 2D points belonging to a camera"""
-        mask = np.where(self.view_points == i)
-        return self.points2D[:, mask]
 
     def get_match(self, i):
         """ return a "Match" object between the i and i+1 image """

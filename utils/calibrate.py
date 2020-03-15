@@ -1,6 +1,5 @@
 import numpy as np
 import cv2
-import os
 import glob
 from SFM.camera import Calibration
 

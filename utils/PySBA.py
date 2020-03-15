@@ -75,6 +75,10 @@ class PySBA:
         points_proj *= (r * f)[:, np.newaxis]
         return points_proj
 
+    def project_bis(self, points, camera):
+        """Convert 3-D points to 2-D by projecting onto images."""
+        return camera.project(points)
+
 
     def fun(self, params, n_cameras, n_points, camera_indices, point_indices, points_2d):
         """Compute residuals.

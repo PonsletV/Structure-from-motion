@@ -11,10 +11,15 @@ from utils.PySBA import PySBA
 im_list = load('dataset/sfm')
 calibration = calibrate('dataset/calib')
 
-detector = Sift(nfeatures=5000)
+detector = Orb(nfeatures=5000)
 matcher = MultiMatch(detector, im_list)
 matcher.fit()
 reconstruction = Reconstruction(matcher, calibration)
-X = reconstruction.reconstruct().T
+X_ba = reconstruction.reconstruct()
+#for sfm in reconstruction.sfm_list:
+#    plot_reprojection(sfm)
 
-plot_3D_points(X)
+plot_reprojection_multi(reconstruction)
+P_list = [cam.projection for cam in reconstruction.camera_list]
+plot_3D_points(X_ba, P_list)
+

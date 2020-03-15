@@ -14,8 +14,9 @@ class Camera(object):
 
     def project(self, X):
         """ Project points in X (3*n array) """
-        return cv2.projectPoints(X, self.projection.rv, self.projection.t,
-                                 self.calibration.K, distCoeffs=self.calibration.dist_coeff)
+        x = cv2.projectPoints(X, self.projection.rv, self.projection.t,
+                              self.calibration.K, distCoeffs=self.calibration.dist_coeff)[0]
+        return np.vstack((x[:, 0, 0], x[:, 0, 1]))
 
     def center(self):
         """ Compute and return the camera center. """
@@ -95,3 +96,13 @@ def compose(P1 : Projection, P2 : Projection):
 
     R_1p2 = np.dot(R1, R2)
     return concat(R_1p2, t_1p2)
+
+
+def camera_from_bundle(cameraArray, K: Calibration):
+    rv = cameraArray[:3]
+    t = cameraArray[3:6]
+    t_array = np.array([[t[0]], [t[1]], [t[2]]])
+
+    R = cv2.Rodrigues(rv)[0]
+    P = concat(R, t_array)
+    return Camera(P, K)

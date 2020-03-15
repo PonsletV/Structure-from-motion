@@ -2,7 +2,7 @@ import numpy as np
 import networkx as nx
 import cv2
 from Descriptors.matching import Match, MultiMatch
-from SFM.camera import Projection, compose, concat, Calibration, Camera
+from SFM.camera import Projection, compose, concat, Calibration, Camera, camera_from_bundle
 from SFM.SFM import Sfm
 from utils.PySBA import PySBA
 
@@ -14,15 +14,17 @@ class Reconstruction(object):
 
     def __init__(self, match: MultiMatch, calibration: Calibration):
         """
-
-        :param bundle_adjustment:
-        :param match:
+        Initialize the pipeline used for reconstruction
+        :param match: a MultiMatch object
+        :param calibration:
         """
 
         self.match = match
         self.calibration = calibration
 
         self.n_reconstruction = len(self.match.matches)
+
+        self.sfm_list = []
 
         self.camera_list = []
         self.points2D = None
@@ -34,79 +36,101 @@ class Reconstruction(object):
         self.camera_list.append(Camera(projection_left, self.calibration))
 
         X = np.array([], dtype=np.float).reshape(3, 0)
-        G = nx.Graph()
-        space_i = 0
-        space_ipp = 0
-        points2D = np.array([], dtype=np.float).reshape(2, 0)
 
-        ind_points = []
-        camera_ind = []
+        count_3D = 0
 
-        last_idx_r = None
-        count = 0
+        twoD_points = np.array([], dtype=np.float).reshape(2, 0)
+        kp_to_points = []
+        kp_view = []
+
+        for (i, kpl) in enumerate(self.match.kp_list):
+            kp_to_points += [[] for _ in kpl]
+            kp_view += [i]*len(kpl)
+            twoD_points = np.hstack((twoD_points, np.array([kp.pt for kp in kpl]).T))
+
+        index_i = 0
+        index_ipp = 0
+
         for i in range(self.n_reconstruction):
             sfm = Sfm(self.calibration, self.match.get_match(i), projection_left)
             X = np.hstack((X, sfm.fit_reconstruction()))
-            n_points = sfm.threeDpoints.shape[1]
+
+            self.sfm_list.append(sfm)
 
             self.camera_list.append(Camera(sfm.P_right, self.calibration))
             self.match.matches[i] = self.match.matches[i][sfm.mask]
 
-            points2D = np.hstack((points2D, np.hstack((sfm.x_l, sfm.x_r))))
-            camera_ind += [i]*sfm.x_l.shape[1]
-            camera_ind += [i+1]*sfm.x_r.shape[1]
-            ind_points += list(zip(list(range(count, count + n_points)),
-                                   list(range(count + sfm.x_r.shape[1], count + sfm.x_r.shape[1] + n_points))))
-            count += 2*n_points
             projection_left = sfm.P_right
 
-            # We link together indices of X which represents the same object point
-            if last_idx_r is not None:
-                space_ipp += last_idx_r.shape[0]
-                for r, kp_idx in enumerate(last_idx_r):
-                    if kp_idx in sfm.idx_l:
-                        l = np.searchsorted(sfm.idx_l, kp_idx)
-                        G.add_edge(r + space_i, l + space_ipp)
-                space_i = space_ipp
+            index_ipp += len(self.match.kp_list[i])
 
-            last_idx_r = sfm.idx_r
+            for i_l, i_r in zip(sfm.idx_l, sfm.idx_r):  # for each point in the new image
+                kp_to_points[i_l+index_i].append(count_3D)
+                kp_to_points[i_r+index_ipp].append(count_3D)
+                count_3D += 1
 
-        points_ind = np.zeros(points2D.shape[1])
+            index_i = index_ipp
 
-        # Now we will keep only one representation for points that appears in more than two views
-        X_new = np.array([], dtype=np.float).reshape(3, 0)
-        to_remove = []
+        points_3d = self.postprocessing(kp_to_points, twoD_points, kp_view, X)
+
+        cameraArray = np.array([cam.to_bundle() for cam in self.camera_list])
+
+        bundle_adjustment = PySBA(cameraArray, points_3d.T, self.points2D.T, self.camera_ind, self.points_ind)
+        cameras, points3D = bundle_adjustment.bundleAdjust()
+        self.points3D = points3D.T
+
+        c_list = []
+        for i in range(cameras.shape[0]):
+            c_list.append(camera_from_bundle(cameraArray[i], self.calibration))
+        self.camera_list = c_list
+
+        #self.points3D = points_3d
+        return self.points3D
+
+    def postprocessing(self, kp_to_points, twoD_points, kp_view, X):
+        G = nx.Graph()
+        points_2d = np.array([], dtype=np.float).reshape(2, 0)
+        camera_ind = []
+        points_ind = []
+        points_3d = np.array([], dtype=np.float).reshape(3, 0)
+        count_3d = 0
+
+        for (i, kp) in enumerate(kp_to_points):
+            if len(kp) == 1:
+                points_2d = np.column_stack((points_2d, twoD_points[:, i]))
+                camera_ind.append(kp_view[i])
+                points_3d = np.column_stack((points_3d, X[:, kp[0]]))
+
+                points_ind.append(count_3d)
+                count_3d += 1
+            elif len(kp) == 2:
+                G.add_edge(kp[0], kp[1], weight=i)
+
         conn = nx.connected_components(G)
-        i=0
-        for g in conn:
-            i += 1
+        for g in conn:  #those 3d points all represents the same object point
+            kpl = []  # List of keypoint indices related to the points of g
+
+            for u in g:
+                for v in g:
+                    if u < v:
+                        a = G.get_edge_data(u, v)
+                        if a is not None:
+                            kpl.append(a['weight'])
+
             x = np.zeros(3)
             for idx in g:
                 x += X[:, idx]
-                to_remove.append(idx)
-                (k, l) = ind_points[idx]
-                points_ind[k] = i
-                points_ind[l] = i
-            x = x/len(g)
-            X_new = np.column_stack((X_new, x))
+            x = x / len(g)
 
-        for idx in range(X.shape[1]):
-            if idx not in to_remove:
-                i += 1
-                (k, l) = ind_points[idx]
-                points_ind[k] = i
-                points_ind[l] = i
+            for kp_idx in kpl:
+                points_2d = np.column_stack((points_2d, twoD_points[:, kp_idx]))
+                camera_ind.append(kp_view[kp_idx])
+                points_ind.append(count_3d)
+            points_3d = np.column_stack((points_3d, x))
+            count_3d += 1
 
-        X = np.delete(X, np.array(to_remove), axis=1)
-        X_new = np.hstack((X_new, X))
-
-        # Now we will gather all the cameras and run the bundle adjustment
-        self.points2D = points2D
+        self.points2D = points_2d
         self.camera_ind = np.array(camera_ind, dtype=np.int16)
-        self.points_ind = np.array(camera_ind, dtype=np.int32)
+        self.points_ind = np.array(points_ind, dtype=np.int32)
 
-        cameraArray = np.array([cam.to_bundle() for cam in self.camera_list])
-        bundle_adjustment = PySBA(cameraArray, X_new.T, points2D.T, self.camera_ind, self.points_ind)
-        cameras, self.points3D = bundle_adjustment.bundleAdjust()
-
-        return self.points3D
+        return points_3d

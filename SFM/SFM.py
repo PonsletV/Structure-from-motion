@@ -73,10 +73,10 @@ class Sfm(object):
 
         # compute the rotation and translation of the transformation
         _, R, t, mask_c = cv2.recoverPose(E, pts_l, pts_r, cameraMatrix=K)
-        self.P_transformation = Projection(concat(R, t))
+        self.P_transformation = concat(R, t)
 
         # compute the new position of the camera
-        P_r = compose(P_l, concat(R, t))
+        P_r = compose(P_l, self.P_transformation)
 
         # select the points that are in front of the selected camera
         infront = np.where(mask_c != 0)[0]

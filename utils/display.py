@@ -3,6 +3,7 @@ from mpl_toolkits.mplot3d import axes3d
 from utils.homography import make_homog
 from matplotlib import pyplot as plt
 from SFM.SFM import Sfm
+from SFM.reconstruction import Reconstruction
 from Descriptors.matching import Match, MultiMatch
 
 
@@ -55,6 +56,9 @@ def plot_3D_points(points3D, P_list=None):
     """
     fig = plt.figure()
     ax = fig.gca(projection='3d')
+    ax.set_xlim3d([-5, 5])
+    ax.set_ylim3d([-5, 5])
+    ax.set_zlim3d([-5, 5])
     ax.plot(points3D[0], points3D[1], points3D[2], 'k.')
     if P_list is not None:
         for P in P_list:
@@ -88,3 +92,26 @@ def plot_reprojection(sfm: Sfm, img_idx="all"):
     plt.plot(xp[0, :], xp[1, :], 'o')
     plt.plot(x[0, :], x[1, :], 'r.')
     plt.axis('off')
+
+
+def plot_reprojection_multi(reconstruction: Reconstruction):
+    n_images = reconstruction.match.n_img
+    for i in range(n_images):
+        img = reconstruction.match.img_list[i]
+        img_shape = reconstruction.match.img_shape
+
+        c = reconstruction.camera_list[i]
+        index = np.where(reconstruction.camera_ind == i)[0]
+        xp = c.project(reconstruction.points3D.T)
+        xp = xp[:, np.where(xp[0, :] <= img_shape[1])[0]]
+        xp = xp[:, np.where(xp[0, :] >= 0)[0]]
+        xp = xp[:, np.where(xp[1, :] <= img_shape[0])[0]]
+        xp = xp[:, np.where(xp[1, :] >= 0)[0]]
+        x = reconstruction.points2D[:, index]
+
+        plt.figure()
+        plt.imshow(img)
+        plt.gray()
+        plt.plot(xp[0, :], xp[1, :], 'o')
+        plt.plot(x[0, :], x[1, :], 'r.')
+        plt.axis('off')
