@@ -31,12 +31,11 @@ class Camera(object):
     def to_bundle(self):
         rv = self.projection.rv
         t = self.projection.t
-        f = self.calibration.focal()
-        k1 = self.calibration.dist_coeff[:, 0]
-        k2 = self.calibration.dist_coeff[:, 1]
+        #f = self.calibration.focal()
+        #k1 = self.calibration.dist_coeff[:, 0]
+        #k2 = self.calibration.dist_coeff[:, 1]
         return np.array([rv[0][0], rv[1][0], rv[2][0],
-                         t[0][0], t[1][0], t[2][0],
-                         f, k1, k2], dtype=float)
+                         t[0][0], t[1][0], t[2][0]], dtype=float)
 
 
 class Projection(object):
@@ -100,7 +99,7 @@ def compose(P1 : Projection, P2 : Projection):
 
 def camera_from_bundle(cameraArray, K: Calibration):
     rv = cameraArray[:3]
-    t = cameraArray[3:6]
+    t = cameraArray[3:]
     t_array = np.array([[t[0]], [t[1]], [t[2]]])
 
     R = cv2.Rodrigues(rv)[0]

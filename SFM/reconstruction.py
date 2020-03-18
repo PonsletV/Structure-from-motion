@@ -75,7 +75,7 @@ class Reconstruction(object):
 
         cameraArray = np.array([cam.to_bundle() for cam in self.camera_list])
 
-        bundle_adjustment = PySBA(cameraArray, points_3d.T, self.points2D.T, self.camera_ind, self.points_ind)
+        bundle_adjustment = PySBA(cameraArray, points_3d.T, self.points2D.T, self.camera_ind, self.points_ind, self.calibration)
         cameras, points3D = bundle_adjustment.bundleAdjust()
         self.points3D = points3D.T
 
@@ -84,8 +84,20 @@ class Reconstruction(object):
             c_list.append(camera_from_bundle(cameraArray[i], self.calibration))
         self.camera_list = c_list
 
-        #self.points3D = points_3d
+        print("Mean-squared Error before B-A: ", self.MSE(points_3d))
+        print("Mean-squared Error after B-A: ", self.MSE(self.points3D))
         return self.points3D
+
+    def MSE(self, points3D):
+        n_images = self.match.n_img
+        error = []
+        for i in range(n_images):
+            c = self.camera_list[i]
+            index = np.where(self.camera_ind == i)[0]
+            xp = c.project(points3D.T[self.points_ind[index]])
+            x = self.points2D[:, index]
+            error.append(np.mean(np.linalg.norm(xp - x, axis=0)))
+        return error
 
     def postprocessing(self, kp_to_points, twoD_points, kp_view, X):
         G = nx.Graph()

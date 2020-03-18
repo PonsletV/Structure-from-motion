@@ -18,19 +18,20 @@ http://scipy-cookbook.readthedocs.io/items/bundle_adjustment.html
 """
 
 import numpy as np
+import SFM.camera as cam
 from scipy.sparse import lil_matrix
 from scipy.optimize import least_squares
+
 
 class PySBA:
     """Python class for Simple Bundle Adjustment"""
 
-    def __init__(self, cameraArray, points3D, points2D, cameraIndices, point2DIndices):
+    def __init__(self, cameraArray, points3D, points2D, cameraIndices, point2DIndices, calibration):
         """Intializes all the class attributes and instance variables.
             Write the specifications for each variable:
-            cameraArray with shape (n_cameras, 9) contains initial estimates of parameters for all cameras.
+            cameraArray with shape (n_cameras, 6) contains initial estimates of parameters for all cameras.
                     First 3 components in each row form a rotation vector,
-                    next 3 components form a translation vector,
-                    then a focal distance and two distortion parameters.
+                    next 3 components form a translation vector.
             points_3d with shape (n_points, 3)
                     contains initial estimates of point coordinates in the world frame.
             camera_ind with shape (n_observations,)
@@ -43,65 +44,41 @@ class PySBA:
         self.cameraArray = cameraArray
         self.points3D = points3D
         self.points2D = points2D
+        self.calibration = calibration
 
         self.cameraIndices = cameraIndices
         self.point2DIndices = point2DIndices
-
-    def rotate(self, points, rot_vecs):
-        """Rotate points by given rotation vectors.
-        Rodrigues' rotation formula is used.
-        """
-        theta = np.linalg.norm(rot_vecs, axis=1)[:, np.newaxis]
-        with np.errstate(invalid='ignore'):
-            v = rot_vecs / theta
-            v = np.nan_to_num(v)
-        dot = np.sum(points * v, axis=1)[:, np.newaxis]
-        cos_theta = np.cos(theta)
-        sin_theta = np.sin(theta)
-
-        return cos_theta * points + sin_theta * np.cross(v, points) + dot * (1 - cos_theta) * v
-
-
-    def project(self, points, cameraArray):
-        """Convert 3-D points to 2-D by projecting onto images."""
-        points_proj = self.rotate(points, cameraArray[:, :3])
-        points_proj += cameraArray[:, 3:6]
-        points_proj = -points_proj[:, :2] / points_proj[:, 2, np.newaxis]
-        f = cameraArray[:, 6]
-        k1 = cameraArray[:, 7]
-        k2 = cameraArray[:, 8]
-        n = np.sum(points_proj ** 2, axis=1)
-        r = 1 + k1 * n + k2 * n ** 2
-        points_proj *= (r * f)[:, np.newaxis]
-        return points_proj
-
-    def project_bis(self, points, camera):
-        """Convert 3-D points to 2-D by projecting onto images."""
-        return camera.project(points)
-
 
     def fun(self, params, n_cameras, n_points, camera_indices, point_indices, points_2d):
         """Compute residuals.
         `params` contains camera parameters and 3-D coordinates.
         """
-        camera_params = params[:n_cameras * 9].reshape((n_cameras, 9))
-        points_3d = params[n_cameras * 9:].reshape((n_points, 3))
-        points_proj = self.project(points_3d[point_indices], camera_params[camera_indices])
-        return (points_proj - points_2d).ravel()
+        camera_params = params[:n_cameras * 6].reshape((n_cameras, 6))
+        points_3d = params[n_cameras * 6:].reshape((n_points, 3))
+        points_proj = np.array([], dtype=np.float).reshape(0, 2)
+        points_2d_ordered = np.array([], dtype=np.float).reshape(0, 2)
+
+        for i in range(n_cameras):
+            c = cam.camera_from_bundle(camera_params[i], self.calibration)
+            index = np.where(camera_indices == i)[0]
+            points_proj = np.vstack((points_proj, c.project(points_3d[point_indices[index]]).T))
+            points_2d_ordered = np.vstack((points_2d_ordered, points_2d[index]))
+
+        return (points_proj - points_2d_ordered).ravel()
 
     def bundle_adjustment_sparsity(self, numCameras, numPoints, cameraIndices, pointIndices):
         m = cameraIndices.size * 2
-        n = numCameras * 9 + numPoints * 3
+        n = numCameras * 6 + numPoints * 3
         A = lil_matrix((m, n), dtype=int)
 
         i = np.arange(cameraIndices.size)
         for s in range(9):
-            A[2 * i, cameraIndices * 9 + s] = 1
-            A[2 * i + 1, cameraIndices * 9 + s] = 1
+            A[2 * i, cameraIndices * 6 + s] = 1
+            A[2 * i + 1, cameraIndices * 6 + s] = 1
 
         for s in range(3):
-            A[2 * i, numCameras * 9 + pointIndices * 3 + s] = 1
-            A[2 * i + 1, numCameras * 9 + pointIndices * 3 + s] = 1
+            A[2 * i, numCameras * 6 + pointIndices * 3 + s] = 1
+            A[2 * i + 1, numCameras * 6 + pointIndices * 3 + s] = 1
 
         return A
 
@@ -109,8 +86,8 @@ class PySBA:
         """
         Retrieve camera parameters and 3-D coordinates.
         """
-        camera_params = params[:n_cameras * 9].reshape((n_cameras, 9))
-        points_3d = params[n_cameras * 9:].reshape((n_points, 3))
+        camera_params = params[:n_cameras * 6].reshape((n_cameras, 6))
+        points_3d = params[n_cameras * 6:].reshape((n_points, 3))
 
         return camera_params, points_3d
 

@@ -102,7 +102,7 @@ def plot_reprojection_multi(reconstruction: Reconstruction):
 
         c = reconstruction.camera_list[i]
         index = np.where(reconstruction.camera_ind == i)[0]
-        xp = c.project(reconstruction.points3D.T)
+        xp = c.project(reconstruction.points3D.T[reconstruction.points_ind[index]])
         xp = xp[:, np.where(xp[0, :] <= img_shape[1])[0]]
         xp = xp[:, np.where(xp[0, :] >= 0)[0]]
         xp = xp[:, np.where(xp[1, :] <= img_shape[0])[0]]
