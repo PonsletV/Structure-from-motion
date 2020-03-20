@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 from mpl_toolkits.mplot3d import axes3d
 from utils.homography import make_homog
 from matplotlib import pyplot as plt
@@ -48,6 +49,20 @@ def plot_matches(match: Match):
     plt.show()
 
 
+def plot_kp(match: Match, img_ind="l"):
+    if img_ind == "r":
+        img = match.img_right
+        kp = match.kp_r
+    else:
+        img = match.img_left
+        kp = match.kp_l
+
+    img2 = np.zeros_like(img)
+    img2 = cv2.drawKeypoints(img, kp, color=(0, 255, 0), flags=0, outImage=img2)
+    plt.imshow(img2)
+    plt.show()
+
+
 def plot_3D_points(points3D, P_list=None):
     """
     Print the 3D points and the camera positions
@@ -92,6 +107,7 @@ def plot_reprojection(sfm: Sfm, img_idx="all"):
     plt.plot(xp[0, :], xp[1, :], 'o')
     plt.plot(x[0, :], x[1, :], 'r.')
     plt.axis('off')
+    plt.show()
 
 
 def plot_reprojection_multi(reconstruction: Reconstruction):

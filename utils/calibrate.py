@@ -14,7 +14,6 @@ def calibrate(dirpath):
     objpoints = [] # 3d point in real world space
     imgpoints = [] # 2d points in image plane.
     images = glob.glob(dirpath+'/*.jpg')
-
     for fname in images:
         img = cv2.imread(fname)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -23,7 +22,7 @@ def calibrate(dirpath):
         # If found, add object points, image points (after refining them)
         if ret == True:
             objpoints.append(objp)
-            corners2 = cv2.cornerSubPix(gray,corners, (11,11), (-1,-1), criteria)
+            corners2 = cv2.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
             imgpoints.append(corners)
             # Draw and display the corners
             cv2.drawChessboardCorners(img, (9,7), corners2, ret)
@@ -35,5 +34,5 @@ def calibrate(dirpath):
     cv2.destroyAllWindows()
 
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
-
+    print("Calibration Done.")
     return Calibration(mtx, dist)

@@ -6,14 +6,16 @@ from SFM.camera import Projection
 from SFM.reconstruction import Reconstruction
 from utils.display import *
 from Descriptors.orb import Orb
-from utils.PySBA import PySBA
 
-im_list = load('dataset/sfm')
+
+im_list = load('dataset/sfm/grillage')
 calibration = calibrate('dataset/calib')
 
 detector = Orb(nfeatures=5000)
 matcher = MultiMatch(detector, im_list)
 matcher.fit()
+
+
 reconstruction = Reconstruction(matcher, calibration)
 X_ba = reconstruction.reconstruct()
 #for sfm in reconstruction.sfm_list:

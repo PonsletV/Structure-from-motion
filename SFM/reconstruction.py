@@ -86,7 +86,8 @@ class Reconstruction(object):
 
         print("Mean-squared Error before B-A: ", self.MSE(points_3d))
         print("Mean-squared Error after B-A: ", self.MSE(self.points3D))
-        return self.points3D
+        # return self.points3D
+        return points_3d
 
     def MSE(self, points3D):
         n_images = self.match.n_img
@@ -106,22 +107,25 @@ class Reconstruction(object):
         points_ind = []
         points_3d = np.array([], dtype=np.float).reshape(3, 0)
         count_3d = 0
+        already_counted = []
 
         for (i, kp) in enumerate(kp_to_points):
             if len(kp) == 1:
                 points_2d = np.column_stack((points_2d, twoD_points[:, i]))
                 camera_ind.append(kp_view[i])
-                points_3d = np.column_stack((points_3d, X[:, kp[0]]))
-
-                points_ind.append(count_3d)
-                count_3d += 1
+                if kp[0] not in already_counted:
+                    points_3d = np.column_stack((points_3d, X[:, kp[0]]))
+                    points_ind.append(count_3d)
+                    count_3d += 1
+                    already_counted.append(kp[0])
+                else:
+                    points_ind.append(already_counted.index(kp[0]))
             elif len(kp) == 2:
                 G.add_edge(kp[0], kp[1], weight=i)
 
         conn = nx.connected_components(G)
         for g in conn:  #those 3d points all represents the same object point
             kpl = []  # List of keypoint indices related to the points of g
-
             for u in g:
                 for v in g:
                     if u < v:

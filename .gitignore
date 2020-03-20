@@ -11,3 +11,5 @@ Experiments/vincent.ipynb
 *.xml
 *.pyc
 *.pyc
+*.ipynb
+Experiments/experiments.py

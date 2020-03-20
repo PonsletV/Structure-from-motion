@@ -49,7 +49,7 @@ class PySBA:
         self.cameraIndices = cameraIndices
         self.point2DIndices = point2DIndices
 
-    def fun(self, params, n_cameras, n_points, camera_indices, point_indices, points_2d):
+    def fun(self, params, n_cameras, n_points, camera_indices, point_indices, points_2d, calibration):
         """Compute residuals.
         `params` contains camera parameters and 3-D coordinates.
         """
@@ -59,7 +59,7 @@ class PySBA:
         points_2d_ordered = np.array([], dtype=np.float).reshape(0, 2)
 
         for i in range(n_cameras):
-            c = cam.camera_from_bundle(camera_params[i], self.calibration)
+            c = cam.camera_from_bundle(camera_params[i], calibration)
             index = np.where(camera_indices == i)[0]
             points_proj = np.vstack((points_proj, c.project(points_3d[point_indices[index]]).T))
             points_2d_ordered = np.vstack((points_2d_ordered, points_2d[index]))
@@ -72,7 +72,7 @@ class PySBA:
         A = lil_matrix((m, n), dtype=int)
 
         i = np.arange(cameraIndices.size)
-        for s in range(9):
+        for s in range(6):
             A[2 * i, cameraIndices * 6 + s] = 1
             A[2 * i + 1, cameraIndices * 6 + s] = 1
 
@@ -98,12 +98,14 @@ class PySBA:
         numPoints = self.points3D.shape[0]
 
         x0 = np.hstack((self.cameraArray.ravel(), self.points3D.ravel()))
-        f0 = self.fun(x0, numCameras, numPoints, self.cameraIndices, self.point2DIndices, self.points2D)
+        f0 = self.fun(x0, numCameras, numPoints, self.cameraIndices,
+                      self.point2DIndices, self.points2D, self.calibration)
 
         A = self.bundle_adjustment_sparsity(numCameras, numPoints, self.cameraIndices, self.point2DIndices)
 
-        res = least_squares(self.fun, x0, jac_sparsity=A, verbose=2, x_scale='jac', ftol=1e-4, method='trf',
-                            args=(numCameras, numPoints, self.cameraIndices, self.point2DIndices, self.points2D))
+        res = least_squares(self.fun, x0, jac_sparsity=A, verbose=2, x_scale='jac', ftol=1e-8, xtol=1e-15,
+                            method='trf', args=(numCameras, numPoints, self.cameraIndices,
+                                                self.point2DIndices, self.points2D, self.calibration))
 
         params = self.optimizedParams(res.x, numCameras, numPoints)
 

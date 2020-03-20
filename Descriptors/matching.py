@@ -58,21 +58,25 @@ class MultiMatch(object):
 
             i += len(kp)
 
+        print("Keypoints Detection done.")
+
         if match_threshold is None:
             match_threshold = 0.1*self.img_shape[0]
 
         matches = []
 
         # Here we match each image with the following
-
         for i in range(self.n_img-1):
             match, _ = select_matches(self.kp_list[i], self.kp_list[i+1],
                                       self.detector.match(des_list[i], des_list[i+1]), match_threshold)
 
             matches.append(match)
+            print("Selected %i Matches between image %i and %i" % (match.shape[0], i, i+1))
 
         self.matches = matches
         self.is_fitted = True
+
+        print("Matching Done")
 
     def get_match(self, i):
         """ return a "Match" object between the i and i+1 image """
